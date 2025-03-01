@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sine Wave Animation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="info">
+        <h1>Wave Animation</h1>
+        <p>Objects animated with different wave patterns</p>
+    </div>
+    
+    <div id="controls">
+        <div class="control-group">
+            <label>Wave Type:</label>
+            <select id="waveType">
+                <option value="sine">Sine Wave</option>
+                <option value="fbm">Fractal Brownian Motion (FBM)</option>
+                <option value="ripple">Ripple</option>
+                <option value="noise">Noise</option>
+                <option value="circular">Circular</option>
+                <option value="combined">Combined</option>
+            </select>
+        </div>
+        <div class="control-info">
+            <p>Keyboard shortcuts: Press 1-6 to change wave types</p>
+        </div>
+    </div>
+    
+    <div id="container"></div>
+    
+    <!-- Import Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module" src="script.js"></script>
+</body>
+</html>
