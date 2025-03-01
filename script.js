@@ -6,12 +6,27 @@ let scene, camera, renderer, controls;
 let objects = [];
 let clock = new THREE.Clock();
 
-// Configuration
-const GRID_SIZE = 50;
-const SPACING = 0.5;
-const AMPLITUDE = 0.5;
-const FREQUENCY = 0.5;
-const SPEED = 1.0;
+// Configuration - default values
+const DEFAULT_CONFIG = {
+    GRID_SIZE: 50,
+    SPACING: 0.5,
+    AMPLITUDE: 0.5,
+    FREQUENCY: 0.5,
+    SPEED: 1.0
+};
+
+// Current configuration (can be modified by UI)
+let config = {
+    GRID_SIZE: DEFAULT_CONFIG.GRID_SIZE,
+    SPACING: DEFAULT_CONFIG.SPACING,
+    AMPLITUDE: DEFAULT_CONFIG.AMPLITUDE,
+    FREQUENCY: DEFAULT_CONFIG.FREQUENCY,
+    SPEED: DEFAULT_CONFIG.SPEED
+};
+
+// Initial camera position
+const INITIAL_CAMERA_POSITION = { x: 0, y: 15, z: 20 };
+const INITIAL_CAMERA_TARGET = { x: 0, y: 0, z: 0 };
 
 // Wave type (can be changed to try different patterns)
 // Options: 'sine', 'fbm', 'ripple', 'noise', 'circular', 'combined'
@@ -46,8 +61,8 @@ function init() {
 
     // Create camera
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 15, 20);
-    camera.lookAt(0, 0, 0);
+    camera.position.set(INITIAL_CAMERA_POSITION.x, INITIAL_CAMERA_POSITION.y, INITIAL_CAMERA_POSITION.z);
+    camera.lookAt(INITIAL_CAMERA_TARGET.x, INITIAL_CAMERA_TARGET.y, INITIAL_CAMERA_TARGET.z);
 
     // Create renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -85,17 +100,134 @@ function init() {
     animate();
 }
 
+// Reset camera to initial position
+function resetCamera() {
+    // Create a smooth transition
+    const duration = 1000; // milliseconds
+    const startTime = Date.now();
+    
+    const startPosition = camera.position.clone();
+    const startTarget = controls.target.clone();
+    
+    const endPosition = new THREE.Vector3(
+        INITIAL_CAMERA_POSITION.x,
+        INITIAL_CAMERA_POSITION.y,
+        INITIAL_CAMERA_POSITION.z
+    );
+    
+    const endTarget = new THREE.Vector3(
+        INITIAL_CAMERA_TARGET.x,
+        INITIAL_CAMERA_TARGET.y,
+        INITIAL_CAMERA_TARGET.z
+    );
+    
+    function animateReset() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease function (cubic ease out)
+        const ease = 1 - Math.pow(1 - progress, 3);
+        
+        // Interpolate position
+        camera.position.lerpVectors(startPosition, endPosition, ease);
+        
+        // Interpolate target
+        controls.target.lerpVectors(startTarget, endTarget, ease);
+        
+        // Update controls
+        controls.update();
+        
+        // Continue animation if not complete
+        if (progress < 1) {
+            requestAnimationFrame(animateReset);
+        }
+    }
+    
+    // Start animation
+    animateReset();
+    
+    console.log('Camera view reset');
+}
+
+// Apply configuration changes and recreate objects
+function applyConfigChanges() {
+    // Clear existing objects
+    objects.forEach(object => {
+        scene.remove(object);
+    });
+    objects = [];
+    
+    // Create new objects with updated configuration
+    createObjects();
+    
+    console.log('Applied configuration changes:', config);
+}
+
+// Reset configuration to defaults
+function resetConfigToDefaults() {
+    config = { ...DEFAULT_CONFIG };
+    
+    // Update UI
+    document.getElementById('gridSize').value = config.GRID_SIZE;
+    document.getElementById('gridSizeSlider').value = config.GRID_SIZE;
+    document.getElementById('spacing').value = config.SPACING;
+    document.getElementById('spacingSlider').value = config.SPACING;
+    document.getElementById('amplitude').value = config.AMPLITUDE;
+    document.getElementById('amplitudeSlider').value = config.AMPLITUDE;
+    document.getElementById('frequency').value = config.FREQUENCY;
+    document.getElementById('frequencySlider').value = config.FREQUENCY;
+    document.getElementById('speed').value = config.SPEED;
+    document.getElementById('speedSlider').value = config.SPEED;
+    
+    // Apply changes
+    applyConfigChanges();
+    
+    console.log('Reset to default configuration');
+}
+
 // Setup UI controls
 function setupUIControls() {
+    // Wave type select
     const waveTypeSelect = document.getElementById('waveType');
-    
-    // Set initial value
     waveTypeSelect.value = currentWaveType;
-    
-    // Add change event listener
     waveTypeSelect.addEventListener('change', function() {
         currentWaveType = this.value;
         console.log('Wave type changed to:', currentWaveType);
+    });
+    
+    // Parameter controls - sync sliders and number inputs
+    setupParameterControl('gridSize', 'GRID_SIZE');
+    setupParameterControl('spacing', 'SPACING');
+    setupParameterControl('amplitude', 'AMPLITUDE');
+    setupParameterControl('frequency', 'FREQUENCY');
+    setupParameterControl('speed', 'SPEED');
+    
+    // Apply changes button
+    document.getElementById('applyChanges').addEventListener('click', applyConfigChanges);
+    
+    // Reset defaults button
+    document.getElementById('resetDefaults').addEventListener('click', resetConfigToDefaults);
+}
+
+// Setup parameter control (slider + number input)
+function setupParameterControl(paramId, configKey) {
+    const numberInput = document.getElementById(paramId);
+    const sliderInput = document.getElementById(paramId + 'Slider');
+    
+    // Set initial values
+    numberInput.value = config[configKey];
+    sliderInput.value = config[configKey];
+    
+    // Sync slider to number input
+    numberInput.addEventListener('input', function() {
+        sliderInput.value = this.value;
+        config[configKey] = parseFloat(this.value);
+    });
+    
+    // Sync number input to slider
+    sliderInput.addEventListener('input', function() {
+        numberInput.value = this.value;
+        config[configKey] = parseFloat(this.value);
     });
 }
 
@@ -134,6 +266,9 @@ function onKeyDown(event) {
             waveTypeSelect.value = currentWaveType;
             console.log('Wave type: Combined');
             break;
+        case 'r':
+            resetCamera();
+            break;
     }
 }
 
@@ -145,7 +280,7 @@ function createObjects() {
 
     const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
 
-    const halfGrid = Math.floor(GRID_SIZE / 2);
+    const halfGrid = Math.floor(config.GRID_SIZE / 2);
     
     for (let x = -halfGrid; x <= halfGrid; x++) {
         for (let z = -halfGrid; z <= halfGrid; z++) {
@@ -157,9 +292,9 @@ function createObjects() {
             const cube = new THREE.Mesh(geometry, material);
             
             // Set initial position
-            cube.position.x = x * SPACING;
+            cube.position.x = x * config.SPACING;
             cube.position.y = 0;
-            cube.position.z = z * SPACING;
+            cube.position.z = z * config.SPACING;
             
             // Store original position for animation
             cube.userData.originalPosition = {
@@ -184,33 +319,33 @@ function updateObjects(time) {
             case 'sine':
                 // Original sine wave pattern
                 const distance = Math.sqrt(originalPos.x * originalPos.x + originalPos.z * originalPos.z);
-                const offset = distance * FREQUENCY;
-                waveY = Math.sin(time * SPEED + offset) * AMPLITUDE;
+                const offset = distance * config.FREQUENCY;
+                waveY = Math.sin(time * config.SPEED + offset) * config.AMPLITUDE;
                 break;
                 
             case 'fbm':
                 // Fractal Brownian Motion
                 const scale = 0.1;
-                waveY = (fbm(originalPos.x * scale, originalPos.z * scale, 4, 2.0, 0.5) * 2 - 1) * AMPLITUDE;
+                waveY = (fbm(originalPos.x * scale, originalPos.z * scale, 4, 2.0, 0.5) * 2 - 1) * config.AMPLITUDE;
                 // Add time-based movement
-                waveY *= Math.sin(time * 0.5) + 1;
+                waveY *= Math.sin(time * 3.5) + 1;
                 break;
                 
             case 'ripple':
                 // Ripple effect (expanding circles)
                 const dist = Math.sqrt(originalPos.x * originalPos.x + originalPos.z * originalPos.z);
-                waveY = Math.sin(dist - time * 2) * AMPLITUDE;
+                waveY = Math.sin(dist - time * 2) * config.AMPLITUDE;
                 break;
                 
             case 'noise':
                 // Simple noise pattern
-                waveY = Math.sin(originalPos.x * 0.5 + time) * Math.cos(originalPos.z * 0.5 + time) * AMPLITUDE;
+                waveY = Math.sin(originalPos.x * 0.5 + time) * Math.cos(originalPos.z * 0.5 + time) * config.AMPLITUDE;
                 break;
                 
             case 'circular':
                 // Circular wave pattern
                 const angle = Math.atan2(originalPos.z, originalPos.x);
-                waveY = Math.sin(angle * 5 + time * 2) * AMPLITUDE;
+                waveY = Math.sin(angle * 5 + time * 2) * config.AMPLITUDE;
                 break;
                 
             case 'combined':
@@ -218,6 +353,7 @@ function updateObjects(time) {
                 const d = Math.sqrt(originalPos.x * originalPos.x + originalPos.z * originalPos.z);
                 const a = Math.atan2(originalPos.z, originalPos.x);
                 waveY = Math.sin(d - time * 2) * 0.3 + Math.sin(a * 3 + time) * 0.3;
+                waveY *= config.AMPLITUDE / 0.5; // Scale by amplitude ratio
                 break;
         }
         
